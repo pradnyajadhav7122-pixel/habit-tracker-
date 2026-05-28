@@ -5,6 +5,7 @@ export default function Home() {
   const [habits, setHabits] = useState([])
   const [habitName, setHabitName] = useState('')
   const [habitCategory, setHabitCategory] = useState('Health')
+  const [habitImage, setHabitImage] = useState(null)
   const [showAdd, setShowAdd] = useState(false)
   const [notificationsEnabled, setNotificationsEnabled] = useState(false)
   const [selectedHabitForCal, setSelectedHabitForCal] = useState(null)
@@ -12,7 +13,6 @@ export default function Home() {
 
   const categories = ['Health', 'Study', 'Work', 'Personal']
 
-  // 1. DATA LOAD + NOTIFICATION CHECK
   useEffect(() => {
     const saved = localStorage.getItem('habitflow-data')
     if (saved) {
@@ -20,18 +20,15 @@ export default function Home() {
       setHabits(parsedHabits)
       if (parsedHabits.length > 0) setSelectedHabitForCal(parsedHabits[0])
     }
-
     if ('Notification' in window) {
       setNotificationsEnabled(Notification.permission === 'granted')
     }
   }, [])
 
-  // 2. DATA SAVE
   useEffect(() => {
     localStorage.setItem('habitflow-data', JSON.stringify(habits))
   }, [habits])
 
-  // 3. 9 PM NOTIFICATION
   useEffect(() => {
     const interval = setInterval(() => {
       const now = new Date()
@@ -52,18 +49,31 @@ export default function Home() {
     }
   }
 
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setHabitImage(reader.result)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
   const addHabit = () => {
     if (!habitName.trim()) return
     const newHabit = {
       id: Date.now(),
       name: habitName,
       category: habitCategory,
+      image: habitImage,
       completedDates: []
     }
     const updatedHabits = [...habits, newHabit]
     setHabits(updatedHabits)
     setSelectedHabitForCal(newHabit)
     setHabitName('')
+    setHabitImage(null)
     setShowAdd(false)
   }
 
@@ -73,7 +83,7 @@ export default function Home() {
       if (habit.id === id) {
         const isCompleted = habit.completedDates.includes(today)
         const newDates = isCompleted
-        ? habit.completedDates.filter(d => d!== today)
+       ? habit.completedDates.filter(d => d!== today)
           : [...habit.completedDates, today]
         return {...habit, completedDates: newDates }
       }
@@ -89,7 +99,6 @@ export default function Home() {
     }
   }
 
-  // CALCULATIONS
   const today = new Date().toISOString().split('T')[0]
   const totalStreaks = habits.reduce((sum, h) => sum + h.completedDates.length, 0)
   const completedToday = habits.filter(h => h.completedDates.includes(today)).length
@@ -99,14 +108,12 @@ export default function Home() {
     count: habits.filter(h => h.category === cat).length
   })).filter(c => c.count > 0)
 
-  // CALENDAR LOGIC
   const getDaysInMonth = (date) => {
     const year = date.getFullYear()
     const month = date.getMonth()
     const firstDay = new Date(year, month, 1)
     const lastDay = new Date(year, month + 1, 0)
     const days = []
-
     for (let i = 0; i < firstDay.getDay(); i++) days.push(null)
     for (let i = 1; i <= lastDay.getDate(); i++) {
       days.push(new Date(year, month, i))
@@ -167,16 +174,21 @@ export default function Home() {
               <div>
                 <h3 className="font-bold mb-3">Streak Chart</h3>
                 {habits.map(habit => (
-                  <div key={habit.id} className="mb-3">
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="font-medium">{habit.name}</span>
-                      <span className="text-gray-500">{habit.completedDates.length} days</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-blue-600 h-2 rounded-full transition-all"
-                        style={{width: `${Math.min(habit.completedDates.length * 5, 100)}%`}}
-                      ></div>
+                  <div key={habit.id} className="mb-3 flex items-center gap-2">
+                    {habit.image && (
+                      <img src={habit.image} alt={habit.name} className="w-8 h-8 rounded object-cover" />
+                    )}
+                    <div className="flex-1">
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="font-medium">{habit.name}</span>
+                        <span className="text-gray-500">{habit.completedDates.length} days</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div
+                          className="bg-blue-600 h-2 rounded-full transition-all"
+                          style={{width: `${Math.min(habit.completedDates.length * 5, 100)}%`}}
+                        ></div>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -210,8 +222,9 @@ export default function Home() {
                 <button
                   key={habit.id}
                   onClick={() => setSelectedHabitForCal(habit)}
-                  className={`px-3 py-1 rounded-lg text-sm whitespace-nowrap transition-all ${selectedHabitForCal?.id === habit.id? 'bg-blue-600 text-white' : 'bg-gray-100 hover:bg-gray-200'}`}
+                  className={`px-3 py-1 rounded-lg text-sm whitespace-nowrap transition-all flex items-center gap-1 ${selectedHabitForCal?.id === habit.id? 'bg-blue-600 text-white' : 'bg-gray-100 hover:bg-gray-200'}`}
                 >
+                  {habit.image && <img src={habit.image} alt="" className="w-4 h-4 rounded" />}
                   {habit.name}
                 </button>
               ))}
@@ -226,7 +239,8 @@ export default function Home() {
                   >
                     ←
                   </button>
-                  <h3 className="font-bold text-center">
+                  <h3 className="font-bold text-center flex items-center gap-2">
+                    {selectedHabitForCal.image && <img src={selectedHabitForCal.image} alt="" className="w-6 h-6 rounded" />}
                     {selectedHabitForCal.name} - {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                   </h3>
                   <button
@@ -274,14 +288,19 @@ export default function Home() {
               const isDone = habit.completedDates.includes(today)
               return (
                 <div key={habit.id} className="bg-white rounded-xl p-4 shadow flex justify-between items-center">
-                  <div>
-                    <h3
-                      onClick={() => setSelectedHabitForCal(habit)}
-                      className="font-semibold cursor-pointer hover:text-blue-600 transition-colors"
-                    >
-                      {habit.name}
-                    </h3>
-                    <p className="text-sm text-gray-500">Streak: {habit.completedDates.length} days | {habit.category}</p>
+                  <div className="flex items-center gap-3">
+                    {habit.image && (
+                      <img src={habit.image} alt={habit.name} className="w-12 h-12 rounded-lg object-cover" />
+                    )}
+                    <div>
+                      <h3
+                        onClick={() => setSelectedHabitForCal(habit)}
+                        className="font-semibold cursor-pointer hover:text-blue-600 transition-colors"
+                      >
+                        {habit.name}
+                      </h3>
+                      <p className="text-sm text-gray-500">Streak: {habit.completedDates.length} days | {habit.category}</p>
+                    </div>
                   </div>
                   <div className="flex gap-2">
                     <button
@@ -309,17 +328,30 @@ export default function Home() {
                 placeholder="e.g., Yoga, Reading"
                 className="w-full border rounded-lg px-3 py-2 mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 autoFocus
-                onKeyDown={(e) => e.key === 'Enter' && addHabit()}
               />
               <select
                 value={habitCategory}
                 onChange={(e) => setHabitCategory(e.target.value)}
-                className="w-full border rounded-lg px-3 py-2 mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border rounded-lg px-3 py-2 mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
               </select>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-2">Habit Photo (Optional)</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                />
+                {habitImage && (
+                  <img src={habitImage} alt="Preview" className="mt-2 w-20 h-20 rounded-lg object-cover" />
+                )}
+              </div>
+
               <div className="flex gap-2">
-                <button onClick={() => setShowAdd(false)} className="flex-1 bg-gray-200 py-2 rounded-lg hover:bg-gray-300">
+                <button onClick={() => {setShowAdd(false); setHabitImage(null)}} className="flex-1 bg-gray-200 py-2 rounded-lg hover:bg-gray-300">
                   Cancel
                 </button>
                 <button onClick={addHabit} className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
