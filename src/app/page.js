@@ -1,244 +1,191 @@
-"use client"
-import { useState, useEffect } from 'react'
+"use client";
+import { useState, useEffect } from 'react';
+import { Plus, Check, X, Trophy, Flame, Calendar, Award, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function Home() {
-  const [habits, setHabits] = useState([])
-  const [habitName, setHabitName] = useState('')
-  const [habitCategory, setHabitCategory] = useState('Health')
-  const [habitImage, setHabitImage] = useState(null)
-  const [showAdd, setShowAdd] = useState(false)
-  const [selectedHabitForCal, setSelectedHabitForCal] = useState(null)
-  const [currentMonth, setCurrentMonth] = useState(new Date())
-
-  const categories = ['Health', 'Study', 'Work', 'Personal']
+  const [habits, setHabits] = useState([]);
+  const [newHabit, setNewHabit] = useState('');
+  const [category, setCategory] = useState('Health');
+  const [time, setTime] = useState('09:00');
+  const [xp, setXp] = useState(0);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
 
   useEffect(() => {
-    const saved = localStorage.getItem('habitflow-data')
-    if (saved) {
-      const parsedHabits = JSON.parse(saved)
-      setHabits(parsedHabits)
-      if (parsedHabits.length > 0) setSelectedHabitForCal(parsedHabits[0])
-    }
-  }, [])
+    const saved = localStorage.getItem('habits-final');
+    if (saved) setHabits(JSON.parse(saved));
+    const savedXp = localStorage.getItem('xp-final');
+    if (savedXp) setXp(parseInt(savedXp));
+  }, []);
 
   useEffect(() => {
-    localStorage.setItem('habitflow-data', JSON.stringify(habits))
-  }, [habits])
-
-  const handleImageUpload = (e) => {
-    const file = e.target.files[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onloadend = () => setHabitImage(reader.result)
-      reader.readAsDataURL(file)
-    }
-  }
+    localStorage.setItem('habits-final', JSON.stringify(habits));
+    localStorage.setItem('xp-final', xp.toString());
+  }, [habits, xp]);
 
   const addHabit = () => {
-    if (!habitName.trim()) return
-    const newHabit = {
+    if (!newHabit.trim()) return;
+    const habit = {
       id: Date.now(),
-      name: habitName,
-      category: habitCategory,
-      image: habitImage,
-      completedDates: []
-    }
-    const updatedHabits = [...habits, newHabit]
-    setHabits(updatedHabits)
-    setSelectedHabitForCal(newHabit)
-    setHabitName('')
-    setHabitImage(null)
-    setShowAdd(false)
-  }
+      name: newHabit,
+      category,
+      time,
+      streak: 0,
+      bestStreak: 0,
+      completedDates: [],
+      createdAt: new Date().toISOString()
+    };
+    setHabits([...habits, habit]);
+    setNewHabit('');
+  };
 
   const toggleHabit = (id) => {
-    const today = new Date().toISOString().split('T')[0]
-    setHabits(habits.map(habit => {
-      if (habit.id === id) {
-        const isCompleted = habit.completedDates.includes(today)
-        const newDates = isCompleted
-     ? habit.completedDates.filter(d => d!== today)
-          : [...habit.completedDates, today]
-        return {...habit, completedDates: newDates }
+    const today = new Date().toISOString().split('T')[0];
+    setHabits(habits.map(h => {
+      if (h.id === id) {
+        const done = h.completedDates.includes(today);
+        if (done) {
+          setXp(xp - 10);
+          return {...h, completedDates: h.completedDates.filter(d => d!== today), streak: Math.max(0, h.streak - 1) };
+        } else {
+          setXp(xp + 10);
+          const newStreak = h.streak + 1;
+          return {...h, completedDates: [...h.completedDates, today], streak: newStreak, bestStreak: Math.max(h.bestStreak, newStreak) };
+        }
       }
-      return habit
-    }))
-  }
+      return h;
+    }));
+  };
 
-  const deleteHabit = (id) => {
-    const updatedHabits = habits.filter(h => h.id!== id)
-    setHabits(updatedHabits)
-    if (selectedHabitForCal?.id === id) {
-      setSelectedHabitForCal(updatedHabits[0] || null)
-    }
-  }
+  const deleteHabit = (id) => setHabits(habits.filter(h => h.id!== id));
 
-  const today = new Date().toISOString().split('T')[0]
+  const level = Math.floor(xp / 100) + 1;
+  const nextLevelXp = level * 100;
 
   const getDaysInMonth = (date) => {
-    const year = date.getFullYear()
-    const month = date.getMonth()
-    const firstDay = new Date(year, month, 1)
-    const lastDay = new Date(year, month + 1, 0)
-    const days = []
-    for (let i = 0; i < firstDay.getDay(); i++) days.push(null)
-    for (let i = 1; i <= lastDay.getDate(); i++) {
-      days.push(new Date(year, month, i))
-    }
-    return days
-  }
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDayOfWeek = firstDay.getDay();
+    const days = [];
+    for (let i = 0; i < startingDayOfWeek; i++) days.push(null);
+    for (let i = 1; i <= daysInMonth; i++) days.push(new Date(year, month, i));
+    return days;
+  };
 
-  const isDateCompleted = (habit, date) => {
-    if (!date ||!habit) return false
-    const dateStr = date.toISOString().split('T')[0]
-    return habit.completedDates.includes(dateStr)
-  }
+  const isDateCompleted = (date) => {
+    if (!date) return false;
+    const dateStr = date.toISOString().split('T')[0];
+    return habits.some(h => h.completedDates.includes(dateStr));
+  };
+
+  const monthDays = getDaysInMonth(currentMonth);
+  const monthName = currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+  const images = {
+    Yoga: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=400&h=300&fit=crop',
+    Reading: 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=400&h=300&fit=crop',
+    Exercise: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=400&h=300&fit=crop',
+    Meditation: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=400&h=300&fit=crop',
+    Health: 'https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=400&h=300&fit=crop',
+    Fitness: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=300&fit=crop',
+    Learning: 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=400&h=300&fit=crop',
+    Work: 'https://images.unsplash.com/photo-1499750310107-5fef28a66643?w=400&h=300&fit=crop'
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold flex items-center gap-2">🔥 HabitFlow</h1>
-          <button
-            onClick={() => setShowAdd(true)}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold"
-          >
-            + Add Habit
-          </button>
-        </div>
-
-        {/* CALENDAR - EXACT PHOTO SARKHA */}
-        <div className="bg-white rounded-xl p-6 shadow mb-6">
-          <div className="grid grid-cols-7 gap-2 text-center text-sm text-gray-400 mb-4">
-            {[3,4,5,6,7,1,2,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31].map((num, idx) => {
-              if (idx < 7) return <div key={idx}>{num}</div>
-              return null
-            })}
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+      <div className="max-w-2xl mx-auto">
+        <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
+                <Trophy className="text-yellow-500" /> Habit Tracker Pro
+              </h1>
+              <p className="text-gray-500 mt-1">Level {level} • {xp} XP Total</p>
+            </div>
+            <div className="text-right">
+              <div className="text-sm text-gray-500">Next Level</div>
+              <div className="text-2xl font-bold text-indigo-600">{nextLevelXp - xp} XP</div>
+            </div>
           </div>
 
+          <div className="w-full bg-gray-200 rounded-full h-3 mb-6">
+            <div className="bg-gradient-to-r from-indigo-500 to-purple-500 h-3 rounded-full transition-all" style={{ width: `${(xp % 100)}%` }}></div>
+          </div>
+
+          <div className="flex gap-2 mb-4">
+            <input type="text" value={newHabit} onChange={(e) => setNewHabit(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && addHabit()} placeholder="Add New Habit..." className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-indigo-500 outline-none" />
+            <select value={category} onChange={(e) => setCategory(e.target.value)} className="px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-indigo-500 outline-none">
+              <option>Health</option><option>Fitness</option><option>Learning</option><option>Work</option><option>Yoga</option><option>Reading</option><option>Exercise</option><option>Meditation</option>
+            </select>
+            <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-indigo-500 outline-none" />
+            <button onClick={addHabit} className="bg-indigo-600 text-white px-6 py-3 rounded-xl hover:bg-indigo-700 transition flex items-center gap-2 font-semibold">
+              <Plus size={20} /> Add
+            </button>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><Calendar className="text-indigo-600" /> {monthName}</h2>
+            <div className="flex gap-2">
+              <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))} className="p-2 hover:bg-gray-100 rounded-lg"><ChevronLeft size={20} /></button>
+              <button onClick={() => setCurrentMonth(new Date())} className="px-3 py-2 text-sm bg-indigo-100 text-indigo-600 rounded-lg font-semibold">Today</button>
+              <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))} className="p-2 hover:bg-gray-100 rounded-lg"><ChevronRight size={20} /></button>
+            </div>
+          </div>
           <div className="grid grid-cols-7 gap-2">
-            {getDaysInMonth(currentMonth).map((date, idx) => (
-              <div key={idx} className="aspect-square">
-                {date && (
-                  <div className={`h-full w-full rounded-lg flex items-center justify-center text-sm
-                    ${selectedHabitForCal && isDateCompleted(selectedHabitForCal, date)? 'bg-green-500 text-white font-bold' : 'text-gray-400'}
-                    ${date.getDate() === 28? 'bg-green-500 text-white font-bold' : ''}
-                    ${date.toISOString().split('T')[0] === today? 'ring-2 ring-blue-500' : ''}`}>
-                    {date.getDate()}
-                  </div>
-                )}
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+              <div key={day} className="text-center text-xs font-semibold text-gray-500 py-2">{day}</div>
+            ))}
+            {monthDays.map((date, i) => (
+              <div key={i} className={`aspect-square flex items-center justify-center rounded-lg text-sm ${!date? '' : isDateCompleted(date)? 'bg-green-500 text-white font-bold' : date.toDateString() === new Date().toDateString()? 'bg-indigo-100 text-indigo-600 font-bold border-2 border-indigo-500' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'}`}>
+                {date?.getDate()}
               </div>
             ))}
           </div>
-
-          <div className="flex gap-4 mt-4 text-xs">
-            <div className="flex items-center gap-1">
-              <div className="w-3 h-3 bg-green-500 rounded"></div>
-              <span>Completed</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="w-3 h-3 bg-gray-50 rounded border"></div>
-              <span>Missed</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="w-3 h-3 border-2 border-blue-500 rounded"></div>
-              <span>Today</span>
-            </div>
-          </div>
         </div>
 
-        {/* HABIT CARDS - PHOTO SARKHE MOTHE */}
-        {habits.length === 0? (
-          <div className="bg-white rounded-xl p-8 text-center shadow">
-            <div className="text-5xl mb-3">🎯</div>
-            <h3 className="font-semibold mb-2">No habits yet</h3>
-            <p className="text-gray-500 text-sm mb-4">Start building better habits today!</p>
-            <button onClick={() => setShowAdd(true)} className="bg-blue-600 text-white px-4 py-2 rounded-lg">
-              + Add Your First Habit
-            </button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {habits.map(habit => {
-              const isDone = habit.completedDates.includes(today)
-              return (
-                <div key={habit.id} className="bg-white rounded-xl shadow overflow-hidden">
-                  {habit.image && (
-                    <img src={habit.image} alt={habit.name} className="w-full h-48 object-cover" />
-                  )}
-                  <div className="p-4">
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <h3 className="font-bold text-lg">{habit.name}</h3>
-                        <p className="text-sm text-gray-500">{habit.category}</p>
+        <div className="space-y-4">
+          {habits.map(habit => {
+            const today = new Date().toISOString().split('T')[0];
+            const done = habit.completedDates.includes(today);
+            return (
+              <div key={habit.id} className="bg-white rounded-2xl shadow-lg overflow-hidden">
+                <img src={images[habit.name] || images[habit.category] || images.Health} alt={habit.name} className="w-full h-48 object-cover" />
+                <div className="p-5">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1">
+                      <h3 className="text-xl font-bold text-gray-800 mb-1">{habit.name}</h3>
+                      <div className="flex items-center gap-3 text-sm text-gray-500">
+                        <span className="bg-indigo-100 text-indigo-600 px-3 py-1 rounded-full font-semibold">{habit.category}</span>
+                        <span>⏰ {habit.time}</span>
                       </div>
-                      <button onClick={() => deleteHabit(habit.id)} className="text-red-500 hover:bg-red-50 p-1 rounded">🗑️</button>
+                    <button onClick={() => deleteHabit(habit.id)} className="text-red-500 hover:bg-red-50 p-2 rounded-lg"><X size={20} /></button>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-1 text-orange-500"><Flame size={18} /><span className="font-bold">{habit.streak} day streak</span></div>
+                      <div className="flex items-center gap-1 text-gray-500"><Award size={16} /><span className="text-sm">Best: {habit.bestStreak}</span></div>
                     </div>
-
-                    <div className="flex items-center gap-1 text-orange-600 text-sm mb-3">
-                      <span>🔥</span>
-                      <span>{habit.completedDates.length} Day Streak</span>
-                    </div>
-
-                    <button
-                      onClick={() => setSelectedHabitForCal(habit)}
-                      className="w-full py-2 rounded-lg text-sm text-blue-600 hover:bg-blue-50 flex items-center justify-center gap-1"
-                    >
-                      📅 View Calendar
+                    <button onClick={() => toggleHabit(habit.id)} className={`px-6 py-3 rounded-xl font-semibold flex items-center gap-2 transition ${done? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                      {done? <><Check size={20} /> Done</> : 'Mark Done'}
                     </button>
                   </div>
                 </div>
-              )
-            })}
-          </div>
-        )}
-
-        {/* ADD HABIT POPUP */}
-        {showAdd && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl p-6 w-full max-w-sm">
-              <h2 className="text-xl font-bold mb-4">Add New Habit</h2>
-              <input
-                type="text"
-                value={habitName}
-                onChange={(e) => setHabitName(e.target.value)}
-                placeholder="e.g., Yoga, Reading"
-                className="w-full border rounded-lg px-3 py-2 mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                autoFocus
-              />
-              <select
-                value={habitCategory}
-                onChange={(e) => setHabitCategory(e.target.value)}
-                className="w-full border rounded-lg px-3 py-2 mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-              </select>
-
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-2">Habit Photo</label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                />
-                {habitImage && (
-                  <img src={habitImage} alt="Preview" className="mt-2 w-full h-32 rounded-lg object-cover" />
-                )}
               </div>
-
-              <div className="flex gap-2">
-                <button onClick={() => {setShowAdd(false); setHabitImage(null)}} className="flex-1 bg-gray-200 py-2 rounded-lg hover:bg-gray-300">
-                  Cancel
-                </button>
-                <button onClick={addHabit} className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
-                  Add
-                </button>
-              </div>
+            );
+          })}
+          {habits.length === 0 && (
+            <div className="bg-white rounded-2xl shadow-lg p-12 text-center text-gray-400">
+              <Calendar size={48} className="mx-auto mb-4 opacity-50" />
+              <p className="text-lg">No habits yet. Add your first habit above!</p>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
-  )
+  );
 }
