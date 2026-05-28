@@ -12,21 +12,26 @@ export default function Home() {
 
   const categories = ['Health', 'Study', 'Work', 'Personal']
 
-  // 1. DATA LOAD + SAVE
+  // 1. DATA LOAD + NOTIFICATION CHECK
   useEffect(() => {
     const saved = localStorage.getItem('habitflow-data')
-    if (saved) setHabits(JSON.parse(saved))
+    if (saved) {
+      const parsedHabits = JSON.parse(saved)
+      setHabits(parsedHabits)
+      if (parsedHabits.length > 0) setSelectedHabitForCal(parsedHabits[0])
+    }
 
     if ('Notification' in window) {
       setNotificationsEnabled(Notification.permission === 'granted')
     }
   }, [])
 
+  // 2. DATA SAVE
   useEffect(() => {
     localStorage.setItem('habitflow-data', JSON.stringify(habits))
   }, [habits])
 
-  // 2. 9 PM NOTIFICATION
+  // 3. 9 PM NOTIFICATION
   useEffect(() => {
     const interval = setInterval(() => {
       const now = new Date()
@@ -55,7 +60,9 @@ export default function Home() {
       category: habitCategory,
       completedDates: []
     }
-    setHabits([...habits, newHabit])
+    const updatedHabits = [...habits, newHabit]
+    setHabits(updatedHabits)
+    setSelectedHabitForCal(newHabit)
     setHabitName('')
     setShowAdd(false)
   }
@@ -75,7 +82,11 @@ export default function Home() {
   }
 
   const deleteHabit = (id) => {
-    setHabits(habits.filter(h => h.id!== id))
+    const updatedHabits = habits.filter(h => h.id!== id)
+    setHabits(updatedHabits)
+    if (selectedHabitForCal?.id === id) {
+      setSelectedHabitForCal(updatedHabits[0] || null)
+    }
   }
 
   // CALCULATIONS
@@ -88,7 +99,7 @@ export default function Home() {
     count: habits.filter(h => h.category === cat).length
   })).filter(c => c.count > 0)
 
-  // CALENDAR
+  // CALENDAR LOGIC
   const getDaysInMonth = (date) => {
     const year = date.getFullYear()
     const month = date.getMonth()
@@ -152,19 +163,19 @@ export default function Home() {
 
         {habits.length > 0 && (
           <div className="bg-white rounded-xl p-4 shadow mb-4">
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <h3 className="font-bold mb-3">Streak Chart</h3>
                 {habits.map(habit => (
-                  <div key={habit.id} className="mb-2">
+                  <div key={habit.id} className="mb-3">
                     <div className="flex justify-between text-sm mb-1">
-                      <span>{habit.name}</span>
-                      <span>{habit.completedDates.length} days</span>
+                      <span className="font-medium">{habit.name}</span>
+                      <span className="text-gray-500">{habit.completedDates.length} days</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
                       <div
-                        className="bg-blue-600 h-2 rounded-full"
-                        style={{width: `${Math.min(habit.completedDates.length * 10, 100)}%`}}
+                        className="bg-blue-600 h-2 rounded-full transition-all"
+                        style={{width: `${Math.min(habit.completedDates.length * 5, 100)}%`}}
                       ></div>
                     </div>
                   </div>
@@ -173,20 +184,20 @@ export default function Home() {
 
               <div>
                 <h3 className="font-bold mb-3">Categories</h3>
-                {categoryData.map(cat => (
-                  <div key={cat.name} className="mb-2">
+                {categoryData.length > 0? categoryData.map(cat => (
+                  <div key={cat.name} className="mb-3">
                     <div className="flex justify-between text-sm mb-1">
-                      <span>{cat.name}</span>
-                      <span>{cat.count} habits</span>
+                      <span className="font-medium">{cat.name}</span>
+                      <span className="text-gray-500">{cat.count} habits</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
                       <div
-                        className="bg-purple-600 h-2 rounded-full"
+                        className="bg-purple-600 h-2 rounded-full transition-all"
                         style={{width: `${(cat.count / habits.length) * 100}%`}}
                       ></div>
                     </div>
                   </div>
-                ))}
+                )) : <p className="text-sm text-gray-400">No categories yet</p>}
               </div>
             </div>
           </div>
@@ -194,12 +205,12 @@ export default function Home() {
 
         {habits.length > 0 && (
           <div className="bg-white rounded-xl p-4 shadow mb-4">
-            <div className="flex gap-2 mb-4 overflow-x-auto">
+            <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
               {habits.map(habit => (
                 <button
                   key={habit.id}
                   onClick={() => setSelectedHabitForCal(habit)}
-                  className={`px-3 py-1 rounded-lg text-sm whitespace-nowrap ${selectedHabitForCal?.id === habit.id? 'bg-blue-600 text-white' : 'bg-gray-100'}`}
+                  className={`px-3 py-1 rounded-lg text-sm whitespace-nowrap transition-all ${selectedHabitForCal?.id === habit.id? 'bg-blue-600 text-white' : 'bg-gray-100 hover:bg-gray-200'}`}
                 >
                   {habit.name}
                 </button>
@@ -209,27 +220,33 @@ export default function Home() {
             {selectedHabitForCal && (
               <>
                 <div className="flex justify-between items-center mb-4">
-                  <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))}>
+                  <button
+                    onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))}
+                    className="px-2 py-1 hover:bg-gray-100 rounded"
+                  >
                     ←
                   </button>
-                  <h3 className="font-bold">
+                  <h3 className="font-bold text-center">
                     {selectedHabitForCal.name} - {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                   </h3>
-                  <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))}>
+                  <button
+                    onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))}
+                    className="px-2 py-1 hover:bg-gray-100 rounded"
+                  >
                     →
                   </button>
                 </div>
 
                 <div className="grid grid-cols-7 gap-1 text-center text-xs font-semibold text-gray-500 mb-2">
-                  {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(d => <div key={d}>{d}</div>)}
+                  {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => <div key={i}>{d}</div>)}
                 </div>
 
                 <div className="grid grid-cols-7 gap-1">
                   {getDaysInMonth(currentMonth).map((date, idx) => (
                     <div key={idx} className="aspect-square">
                       {date && (
-                        <div className={`h-full w-full rounded flex items-center justify-center text-sm
-                          ${isDateCompleted(selectedHabitForCal, date)? 'bg-green-500 text-white font-bold' : 'bg-gray-50'}
+                        <div className={`h-full w-full rounded flex items-center justify-center text-sm transition-all
+                          ${isDateCompleted(selectedHabitForCal, date)? 'bg-green-500 text-white font-bold' : 'bg-gray-50 hover:bg-gray-100'}
                           ${date.toISOString().split('T')[0] === today? 'ring-2 ring-blue-500' : ''}`}>
                           {date.getDate()}
                         </div>
@@ -243,26 +260,42 @@ export default function Home() {
         )}
 
         <div className="space-y-3">
-          {habits.map(habit => {
-            const isDone = habit.completedDates.includes(today)
-            return (
-              <div key={habit.id} className="bg-white rounded-xl p-4 shadow flex justify-between items-center">
-                <div>
-                  <h3 className="font-semibold">{habit.name}</h3>
-                  <p className="text-sm text-gray-500">Streak: {habit.completedDates.length} days | {habit.category}</p>
+          {habits.length === 0? (
+            <div className="bg-white rounded-xl p-8 text-center shadow">
+              <div className="text-5xl mb-3">🎯</div>
+              <h3 className="font-semibold mb-2">No habits yet</h3>
+              <p className="text-gray-500 text-sm mb-4">Start building better habits today!</p>
+              <button onClick={() => setShowAdd(true)} className="bg-blue-600 text-white px-4 py-2 rounded-lg">
+                + Add Your First Habit
+              </button>
+            </div>
+          ) : (
+            habits.map(habit => {
+              const isDone = habit.completedDates.includes(today)
+              return (
+                <div key={habit.id} className="bg-white rounded-xl p-4 shadow flex justify-between items-center">
+                  <div>
+                    <h3
+                      onClick={() => setSelectedHabitForCal(habit)}
+                      className="font-semibold cursor-pointer hover:text-blue-600 transition-colors"
+                    >
+                      {habit.name}
+                    </h3>
+                    <p className="text-sm text-gray-500">Streak: {habit.completedDates.length} days | {habit.category}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => toggleHabit(habit.id)}
+                      className={`px-4 py-2 rounded-lg font-semibold transition-all ${isDone? 'bg-green-100 text-green-700' : 'bg-gray-100 hover:bg-gray-200'}`}
+                    >
+                      {isDone? '✓ Done' : 'Mark Done'}
+                    </button>
+                    <button onClick={() => deleteHabit(habit.id)} className="text-red-500 px-2 hover:bg-red-50 rounded">🗑️</button>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => toggleHabit(habit.id)}
-                    className={`px-4 py-2 rounded-lg font-semibold ${isDone? 'bg-green-100 text-green-700' : 'bg-gray-100'}`}
-                  >
-                    {isDone? '✓ Done' : 'Mark Done'}
-                  </button>
-                  <button onClick={() => deleteHabit(habit.id)} className="text-red-500 px-2">🗑️</button>
-                </div>
-              </div>
-            )
-          })}
+              )
+            })
+          )}
         </div>
 
         {showAdd && (
@@ -274,21 +307,22 @@ export default function Home() {
                 value={habitName}
                 onChange={(e) => setHabitName(e.target.value)}
                 placeholder="e.g., Yoga, Reading"
-                className="w-full border rounded-lg px-3 py-2 mb-3"
+                className="w-full border rounded-lg px-3 py-2 mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 autoFocus
+                onKeyDown={(e) => e.key === 'Enter' && addHabit()}
               />
               <select
                 value={habitCategory}
                 onChange={(e) => setHabitCategory(e.target.value)}
-                className="w-full border rounded-lg px-3 py-2 mb-4"
+                className="w-full border rounded-lg px-3 py-2 mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
               </select>
               <div className="flex gap-2">
-                <button onClick={() => setShowAdd(false)} className="flex-1 bg-gray-200 py-2 rounded-lg">
+                <button onClick={() => setShowAdd(false)} className="flex-1 bg-gray-200 py-2 rounded-lg hover:bg-gray-300">
                   Cancel
                 </button>
-                <button onClick={addHabit} className="flex-1 bg-blue-600 text-white py-2 rounded-lg">
+                <button onClick={addHabit} className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
                   Add
                 </button>
               </div>
